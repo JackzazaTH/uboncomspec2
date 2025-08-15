@@ -1,3 +1,4 @@
+// src/App.tsx
 import React, { useEffect, useMemo, useRef, useState } from "react";
 import { Button } from "@/components/ui/button";
 import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card";
@@ -18,11 +19,11 @@ import {
 import * as XLSX from "xlsx";
 
 /**
- * Ubon Computer Spec V.3.1 — Single-file demo
- * - Inventory (CRUD) + Excel import
- * - Builder with Required categories, Attribute Filters, Smart Sync
- * - Compatibility checks + PSU wattage estimate
- * - Add-ons (Monitor/Software/SSD) with quantity
+ * Ubon Computer Spec V.3.1 — Single-file App
+ * - Inventory (CRUD) + Excel/CSV import
+ * - Builder: Required categories, Attribute Filters with Smart Sync
+ * - Compatibility checks (compact + expand)
+ * - Add-ons (Monitor/Software/SSD)
  * - Summary with Discount/VAT/Cost/Profit + copy/print
  * - Search & Sort + Reset spec
  */
@@ -269,8 +270,8 @@ function InventoryTable({ items, onEdit, onDelete }:{ items: Product[]; onEdit:(
         <div className="col-span-2 text-right">{baht(p.price)}{typeof p.cost==="number" ? <span className="text-xs text-muted-foreground"> (ทุน {baht(p.cost)})</span> : null}</div>
         <div className="col-span-1 text-right">{p.stock}</div>
         <div className="col-span-2 flex justify-end gap-2">
-          <Button variant="secondary" onClick={()=>onEdit(p)} title="แก้ไข"><Edit className="w-4 h-4"/></Button>
-          <Button variant="destructive" onClick={()=>onDelete(p.id)} title="ลบ"><Trash2 className="w-4 h-4"/></Button>
+          <Button className="h-8 px-3 text-sm" variant="secondary" onClick={()=>onEdit(p)} title="แก้ไข"><Edit className="w-4 h-4 mr-1"/>แก้ไข</Button>
+          <Button className="h-8 px-3 text-sm" variant="destructive" onClick={()=>onDelete(p.id)} title="ลบ"><Trash2 className="w-4 h-4 mr-1"/>ลบ</Button>
         </div>
       </div>))}
     </div>
@@ -289,7 +290,7 @@ function CategoryAttrFields({ category, attr, setAttr }:{ category: Category; at
 
   if (category==="CPU"){
     return (<div className="grid grid-cols-2 gap-3">
-      <div><Label>Socket</Label><Input value={attr.socket||""} onChange={e=>set("socket", e.target.value)} placeholder="เช่น AM5, LGA1700"/></div>
+      <div><Label>ซ็อกเก็ต</Label><Input value={attr.socket||""} onChange={e=>set("socket", e.target.value)} placeholder="เช่น AM5, LGA1700"/></div>
       <div><Label>TDP (W)</Label><Input type="number" value={attr.tdp||""} onChange={e=>set("tdp", Number(e.target.value||0))}/></div>
     </div>);
   }
@@ -299,9 +300,9 @@ function CategoryAttrFields({ category, attr, setAttr }:{ category: Category; at
     const storageIfs = ["M.2 NVMe","SATA"];
     return (<div className="space-y-3">
       <div className="grid grid-cols-2 gap-3">
-        <div><Label>Socket</Label><Input value={attr.socket||""} onChange={e=>set("socket", e.target.value)} /></div>
+        <div><Label>ซ็อกเก็ต</Label><Input value={attr.socket||""} onChange={e=>set("socket", e.target.value)} /></div>
         <div>
-          <Label>RAM Type</Label>
+          <Label>ชนิดแรม</Label>
           <Select value={attr.ramType||""} onValueChange={(v)=>set("ramType", v)}>
             <SelectTrigger><SelectValue placeholder="เลือกชนิด RAM"/></SelectTrigger>
             <SelectContent>{ramTypes.map(x=><SelectItem key={x} value={x}>{x}</SelectItem>)}</SelectContent>
@@ -317,7 +318,7 @@ function CategoryAttrFields({ category, attr, setAttr }:{ category: Category; at
         <div><Label>PCIe Slots</Label><Input type="number" value={attr.pcieSlots||""} onChange={e=>set("pcieSlots", Number(e.target.value||0))}/></div>
       </div>
       <div>
-        <Label>Storage Ports</Label>
+        <Label>พอร์ตเก็บข้อมูล / อินเทอร์เฟซ</Label>
         <div className="flex gap-2 mt-1 flex-wrap">
           {storageIfs.map(s => <Chip key={s} active={(attr.storage||[]).includes(s)} onClick={()=>toggleInArray("storage", s)}>{s}</Chip>)}
         </div>
@@ -339,7 +340,7 @@ function CategoryAttrFields({ category, attr, setAttr }:{ category: Category; at
   if (category==="Storage" || category==="SSD"){
     return (<div className="grid grid-cols-2 gap-3">
       <div>
-        <Label>Interface</Label>
+        <Label>อินเทอร์เฟซ</Label>
         <Select value={attr.interface||""} onValueChange={(v)=>set("interface", v)}>
           <SelectTrigger><SelectValue placeholder="M.2 NVMe / SATA"/></SelectTrigger>
           <SelectContent><SelectItem value="M.2 NVMe">M.2 NVMe</SelectItem><SelectItem value="SATA">SATA</SelectItem></SelectContent>
@@ -442,14 +443,18 @@ function ProductEditor({ initial, onSave }: { initial?: Partial<Product>, onSave
 }
 
 // ===== Base Picker =====
-function BasePicker({ inventory, selection, onSelect, sortMode, onChangeSort, required, filters }:{ inventory: Product[]; selection: Partial<Record<BaseCategory, Product>>; onSelect:(cat:BaseCategory, product:Product|null)=>void; sortMode: SortMode; onChangeSort:(m:SortMode)=>void; required: BaseCategory[]; filters: AttrFilters; }){
+function BasePicker({
+  inventory, selection, onSelect, sortMode, onChangeSort, required, filters
+}:{ inventory: Product[]; selection: Partial<Record<BaseCategory, Product>>; onSelect:(cat:BaseCategory, product:Product|null)=>void; sortMode: SortMode; onChangeSort:(m:SortMode)=>void; required: BaseCategory[]; filters: AttrFilters; }){
   const [baseSearch, setBaseSearch] = React.useState("");
   const searchLower = baseSearch.trim().toLowerCase();
+
   const byCatRaw = useMemo(()=>{
     const map: Record<BaseCategory, Product[]> = Object.fromEntries(BASE_CATEGORIES.map(c=>[c,[]])) as any;
     for (const p of inventory) if (BASE_CATEGORIES.includes(p.category as BaseCategory) && p.stock>0) map[p.category as BaseCategory].push(p);
     return map;
   }, [inventory]);
+
   const byCat = useMemo(()=>{
     const m: Record<BaseCategory, Product[]> = {} as any;
     for (const c of BASE_CATEGORIES) m[c] = applyAttrFilters(c, byCatRaw[c], filters);
@@ -463,6 +468,7 @@ function BasePicker({ inventory, selection, onSelect, sortMode, onChangeSort, re
 
   return (
     <div className="grid md:grid-cols-3 gap-4">
+      {/* Main selector */}
       <Card className="shadow-sm md:col-span-2">
         <CardHeader><CardTitle className="flex items-center gap-2"><ListChecks className="w-5 h-5"/> อุปกรณ์หลัก</CardTitle></CardHeader>
         <CardContent className="space-y-3">
@@ -472,24 +478,40 @@ function BasePicker({ inventory, selection, onSelect, sortMode, onChangeSort, re
             </div>
           )}
           <div className="flex items-center justify-between gap-2 text-sm">
-            <div className="flex items-center gap-2 w-1/2"><span className="text-muted-foreground">ค้นหา:</span><Input placeholder="ค้นหาชื่อสินค้า..." value={baseSearch} onChange={(e)=>setBaseSearch(e.target.value)} /></div>
-            <span className="text-muted-foreground">จัดเรียง:</span>
-            <Select value={sortMode} onValueChange={(v)=>onChangeSort(v as SortMode)}>
-              <SelectTrigger className="w-44"><SelectValue placeholder="เลือกการจัดเรียง"/></SelectTrigger>
-              <SelectContent>
-                <SelectItem value="default">ค่าเริ่มต้น</SelectItem>
-                <SelectItem value="priceAsc">ราคาต่ำ→สูง</SelectItem>
-                <SelectItem value="priceDesc">ราคาสูง→ต่ำ</SelectItem>
-                <SelectItem value="nameAsc">ชื่อ A→Z</SelectItem>
-                <SelectItem value="stockDesc">สต็อกมาก→น้อย</SelectItem>
-              </SelectContent>
-            </Select>
+            <div className="flex items-center gap-2 w-1/2">
+              <span className="text-muted-foreground">ค้นหา:</span>
+              <Input placeholder="ค้นหาชื่อสินค้า..." value={baseSearch} onChange={(e)=>setBaseSearch(e.target.value)} />
+            </div>
+            <div className="flex items-center gap-2">
+              <span className="text-muted-foreground">จัดเรียง:</span>
+              <Select value={sortMode} onValueChange={(v)=>onChangeSort(v as SortMode)}>
+                <SelectTrigger className="w-44"><SelectValue placeholder="เลือกการจัดเรียง"/></SelectTrigger>
+                <SelectContent>
+                  <SelectItem value="default">ค่าเริ่มต้น</SelectItem>
+                  <SelectItem value="priceAsc">ราคาต่ำ→สูง</SelectItem>
+                  <SelectItem value="priceDesc">ราคาสูง→ต่ำ</SelectItem>
+                  <SelectItem value="nameAsc">ชื่อ A→Z</SelectItem>
+                  <SelectItem value="stockDesc">สต็อกมาก→น้อย</SelectItem>
+                </SelectContent>
+              </Select>
+            </div>
           </div>
           {BASE_CATEGORIES.map((cat)=>(
             <div key={cat} className="grid grid-cols-12 items-center gap-2 p-2 rounded-xl hover:bg-muted/40">
               <div className="col-span-4 font-medium flex items-center gap-2">{categoryIcon[cat]} {cat} {required.includes(cat) && <span className="text-red-600 text-xs">*จำเป็น</span>}</div>
               <div className="col-span-8 flex gap-2">
-                <Select value={selection[cat]?.id || "__none__"} onValueChange={(id)=>{ if(id==="__none__"){ onSelect(cat, null); if (required.includes(cat)) toast.error(`${cat} เป็นหมวดจำเป็น`); return; } const item = byCat[cat].find(p=>p.id===id) || null; onSelect(cat, item); }}>
+                <Select
+                  value={selection[cat]?.id || "__none__"}
+                  onValueChange={(id)=>{
+                    if(id==="__none__"){
+                      onSelect(cat, null);
+                      if (required.includes(cat)) toast.error(`${cat} เป็นหมวดจำเป็น`);
+                      return;
+                    }
+                    const item = byCat[cat].find(p=>p.id===id) || null;
+                    onSelect(cat, item);
+                  }}
+                >
                   <SelectTrigger className="w-full"><SelectValue placeholder={`เลือก ${cat} (ข้ามได้)`} /></SelectTrigger>
                   <SelectContent>
                     <SelectItem key="__none__" value="__none__">— ไม่เลือก (ข้าม) —</SelectItem>
@@ -508,6 +530,7 @@ function BasePicker({ inventory, selection, onSelect, sortMode, onChangeSort, re
         </CardContent>
       </Card>
 
+      {/* Compatibility compact */}
       <Card className="shadow-sm">
         <CardHeader><CardTitle className="flex items-center gap-2"><CheckCircle2 className="w-5 h-5"/> ความเข้ากันได้</CardTitle></CardHeader>
         <CardContent>
@@ -519,7 +542,10 @@ function BasePicker({ inventory, selection, onSelect, sortMode, onChangeSort, re
               </div>
             ))}
             {(showAllComp ? comp.notes : comp.notes.filter(n=>n.level!=="ok")).length===0 && <div className="text-muted-foreground text-sm">ปกติทุกอย่าง หรือยังไม่ได้เลือกชิ้นส่วน</div>}
-            <div className="flex items-center justify-between mt-3 text-sm text-muted-foreground"><span>ประมาณการกำลังไฟ ~ {estimateWattage(selection)}W</span><Button  variant="secondary" className="h-8 px-3 text-sm" onClick={()=>setShowAllComp(s=>!s)}>{showAllComp ? "ย่อ" : "ดูทั้งหมด"}</Button></div>
+            <div className="flex items-center justify-between mt-3 text-sm text-muted-foreground">
+              <span>ประมาณการกำลังไฟ ~ {estimateWattage(selection)}W</span>
+              <Button className="h-8 px-3 text-sm" variant="secondary" onClick={()=>setShowAllComp(s=>!s)}>{showAllComp ? "ย่อ" : "ดูทั้งหมด"}</Button>
+            </div>
           </div>
         </CardContent>
       </Card>
@@ -626,7 +652,7 @@ function AddonsPicker({ inventory, addons, addAddon, updateQty, removeAddon, sor
                 <div className="col-span-6 flex items-center gap-2"><Badge variant="secondary">{a.product.category}</Badge><span className="truncate" title={a.product.name}>{a.product.name}</span></div>
                 <div className="col-span-2 text-center"><Input type="number" min={1} value={a.qty} onChange={(e)=>updateQty(a.id, Math.max(1, Number(e.target.value||1)))} /></div>
                 <div className="col-span-2 text-right">{baht(a.product.price)}</div>
-                <div className="col-span-2 text-right flex items-center justify-end gap-2">{baht(a.product.price * a.qty)}<Button variant="destructive" onClick={()=>removeAddon(a.id)}><Trash2 className="w-4 h-4"/></Button></div>
+                <div className="col-span-2 text-right flex items-center justify-end gap-2">{baht(a.product.price*a.qty)}<Button className="h-8 px-3 text-sm" variant="destructive" onClick={()=>removeAddon(a.id)}><Trash2 className="w-4 h-4"/></Button></div>
               </div>
             ))}
           </div>
@@ -915,7 +941,7 @@ export default function App(){
 
   return (
     <div className="p-4 md:p-8 max-w-7xl mx-auto">
-      {/* Modern header */}
+      {/* Header */}
       <div className="rounded-2xl p-5 mb-3 bg-gradient-to-r from-slate-900 via-slate-800 to-slate-700 text-white shadow">
         <motion.h1 initial={{opacity:0, y:-8}} animate={{opacity:1, y:0}} transition={{duration:0.2}} className="text-2xl md:text-3xl font-bold tracking-tight">
           Ubon Computer Spec V.3.1
@@ -954,6 +980,7 @@ export default function App(){
                   }}>{active ? `✓ ${c}` : c}</Button>;
                 })}
               </div>
+
               <div className="flex flex-wrap items-center gap-2">
                 <div className="text-sm text-muted-foreground mr-1">Smart Sync (ซิงก์ตัวกรองตามชิ้นส่วนที่เลือก):</div>
                 <Button variant="secondary" onClick={()=>{ setSmartSync(!smartSync); toast.message(!smartSync ? 'เปิด Smart Sync' : 'ปิด Smart Sync'); }}>{smartSync ? "เปิดอยู่" : "ปิดอยู่"}</Button>
@@ -967,34 +994,42 @@ export default function App(){
                   <button className="h-8 px-3 rounded-lg bg-slate-100 hover:bg-slate-200 text-sm" onClick={()=>setFilters({})}>ล้างตัวกรองทั้งหมด</button>
                 </div>
               </div>
+
               <div className="grid md:grid-cols-3 gap-3">
                 <div className="space-y-1">
-                  <Label>Socket (CPU/MB)</Label>
+                  <Label>ซ็อกเก็ต (CPU/เมนบอร์ด)</Label>
                   <div className="flex flex-wrap gap-2">
                     {socketOptions.map(s=>(<Chip key={s} active={filters.socket===s} onClick={()=>setFilters({...filters, socket: filters.socket===s? undefined : s})}>{s}</Chip>))}
                   </div>
                   {filters.socket && <div className="mt-1"><ClearChip label={`Socket: ${filters.socket}`} onClear={()=>setFilters({...filters, socket: undefined})}/></div>}
+                  <div className="text-xs text-muted-foreground mt-1">ตัวอย่าง: AM5, LGA1700</div>
                 </div>
+
                 <div className="space-y-1">
-                  <Label>RAM Type (MB/RAM)</Label>
+                  <Label>ชนิดแรม</Label>
                   <div className="flex flex-wrap gap-2">
                     {ramTypeOptions.map(s=>(<Chip key={s} active={filters.ramType===s} onClick={()=>setFilters({...filters, ramType: filters.ramType===s? undefined : s})}>{s}</Chip>))}
                   </div>
                   {filters.ramType && <div className="mt-1"><ClearChip label={`RAM: ${filters.ramType}`} onClear={()=>setFilters({...filters, ramType: undefined})}/></div>}
+                  <div className="text-xs text-muted-foreground mt-1">เช่น DDR5 / DDR4</div>
                 </div>
+
                 <div className="space-y-1">
-                  <Label>Form Factor (MB/Case)</Label>
+                  <Label>ขนาดเมนบอร์ด (Form Factor)</Label>
                   <div className="flex flex-wrap gap-2">
                     {formFactorOptions.map(s=>(<Chip key={s} active={filters.formFactor===s} onClick={()=>setFilters({...filters, formFactor: filters.formFactor===s? undefined : s})}>{s}</Chip>))}
                   </div>
                   {filters.formFactor && <div className="mt-1"><ClearChip label={`Form: ${filters.formFactor}`} onClear={()=>setFilters({...filters, formFactor: undefined})}/></div>}
+                  <div className="text-xs text-muted-foreground mt-1">ATX / mATX / ITX</div>
                 </div>
+
                 <div className="space-y-1">
-                  <Label>Storage Interface (MB/Storage)</Label>
+                  <Label>พอร์ตเก็บข้อมูล / อินเทอร์เฟซ</Label>
                   <div className="flex flex-wrap gap-2">
                     {storageIfOptions.map(s=>(<Chip key={s} active={filters.storageInterface===s} onClick={()=>setFilters({...filters, storageInterface: filters.storageInterface===s? undefined : s})}>{s}</Chip>))}
                   </div>
                   {filters.storageInterface && <div className="mt-1"><ClearChip label={`Storage: ${filters.storageInterface}`} onClear={()=>setFilters({...filters, storageInterface: undefined})}/></div>}
+                  <div className="text-xs text-muted-foreground mt-1">M.2 NVMe / SATA</div>
                 </div>
               </div>
             </CardContent>
@@ -1046,13 +1081,6 @@ export default function App(){
               <InventoryTable items={sortedFiltered} onEdit={setEditing} onDelete={deleteProduct} />
             </CardContent>
           </Card>
-
-          <Dialog open={!!editing} onOpenChange={(o)=>{ if(!o) setEditing(null); }}>
-            <DialogContent className="sm:max-w-[720px]">
-              <DialogHeader><DialogTitle>{editing?.id ? "แก้ไขสินค้า" : "เพิ่มสินค้า"}</DialogTitle></DialogHeader>
-              {editing && <ProductEditor initial={editing||undefined} onSave={(p)=>{ saveProduct(p); setEditing(null); }} />}
-            </DialogContent>
-          </Dialog>
         </TabsContent>
 
         <TabsContent value="summary" className="space-y-4">
@@ -1062,12 +1090,15 @@ export default function App(){
 
       {/* Search Dialog */}
       <Dialog open={searchOpen} onOpenChange={setSearchOpen}>
-        <DialogContent className="sm:max-w-[720px]">
+        <DialogContent className="sm:max-w-[720px] relative">
+          <button aria-label="Close" onClick={()=>setSearchOpen(false)} className="absolute right-3 top-3 rounded-full h-8 w-8 flex items-center justify-center hover:bg-muted">
+            <X className="w-4 h-4"/>
+          </button>
           <DialogHeader><DialogTitle>ค้นหาสินค้า</DialogTitle></DialogHeader>
           <div className="space-y-3">
             <Input
               autoFocus
-              placeholder='พิมพ์คำค้น เช่น "Ryzen", "27"", "Windows", "NV2"'
+              placeholder='พิมพ์คำค้น เช่น "Ryzen", "27\"", "Windows", "NV2"'
               value={searchText}
               onChange={(e)=>setSearchText(e.target.value)}
             />
@@ -1080,7 +1111,7 @@ export default function App(){
                   sortMode
                 );
                 if (results.length === 0) return <div className="px-4 py-3 text-muted-foreground">ไม่พบสินค้า</div>;
-                return results.map((p, i) => (
+                return results.map((p) => (
                   <div key={p.id} className="flex items-center justify-between px-4 py-2 border-t first:border-t-0 hover:bg-muted/40">
                     <div className="flex items-center gap-2">
                       <Badge variant="secondary">{p.category}</Badge>
@@ -1100,6 +1131,17 @@ export default function App(){
             </div>
           </div>
           <DialogFooter><Button variant="secondary" onClick={()=>setSearchOpen(false)}>ปิด</Button></DialogFooter>
+        </DialogContent>
+      </Dialog>
+
+      {/* Product Editor Dialog */}
+      <Dialog open={!!editing} onOpenChange={(o)=>{ if(!o) setEditing(null); }}>
+        <DialogContent className="sm:max-w-[720px] relative">
+          <button aria-label="Close" onClick={()=>setEditing(null)} className="absolute right-3 top-3 rounded-full h-8 w-8 flex items-center justify-center hover:bg-muted">
+            <X className="w-4 h-4"/>
+          </button>
+          <DialogHeader><DialogTitle>{editing?.id ? "แก้ไขสินค้า" : "เพิ่มสินค้า"}</DialogTitle></DialogHeader>
+          {editing && <ProductEditor initial={editing||undefined} onSave={(p)=>{ saveProduct(p); setEditing(null); }} />}
         </DialogContent>
       </Dialog>
 
