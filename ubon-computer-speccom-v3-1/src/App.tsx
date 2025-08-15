@@ -18,7 +18,7 @@ import {
 import * as XLSX from "xlsx";
 
 /**
- * Ubon Computer Spec V.3.1
+ * Ubon Computer Speccom V.3
  * - Smart Sync: auto-apply attribute filters from selected parts (CPU/MB/Cooler/Storage/PSU)
  * - Attribute Filters: chips + one-click clear
  * - Product Editor: per-category attribute fields + Advanced JSON (optional)
@@ -446,6 +446,7 @@ function ProductEditor({ initial, onSave }: { initial?: Partial<Product>, onSave
         onSave({ id:(initial?.id as string)||uid(), name, category, price, stock, cost, attributes: attrs } as Product);
       }}><Save className="w-4 h-4 mr-2"/> บันทึกสินค้า</Button></div>
     </div>
+    </MotionConfig>
   );
 }
 
@@ -468,7 +469,7 @@ function BasePicker({ inventory, selection, onSelect, sortMode, onChangeSort, re
   const missingRequired = useMemo(()=>required.filter(c => !selection[c]), [required, selection]);
 
   return (
-    <motion.div initial={{opacity:0, y:8}} animate={{opacity:1, y:0}} transition={{duration:0.25}} className="grid md:grid-cols-2 gap-4">
+    <div className="grid md:grid-cols-2 gap-4">
       <Card className="shadow-sm">
         <CardHeader><CardTitle className="flex items-center gap-2"><ListChecks className="w-5 h-5"/> อุปกรณ์หลัก</CardTitle></CardHeader>
         <CardContent className="space-y-3">
@@ -491,7 +492,7 @@ function BasePicker({ inventory, selection, onSelect, sortMode, onChangeSort, re
             </Select>
           </div>
           {BASE_CATEGORIES.map((cat)=>(
-            <div key={cat} className="grid grid-cols-12 items-center gap-2 p-2 rounded-xl hover:bg-muted/40 transition-transform duration-150 hover:scale-[1.01]">
+            <div key={cat} className="grid grid-cols-12 items-center gap-2 p-2 rounded-xl hover:bg-muted/40">
               <div className="col-span-4 font-medium flex items-center gap-2">{categoryIcon[cat]} {cat} {required.includes(cat) && <span className="text-red-600 text-xs">*จำเป็น</span>}</div>
               <div className="col-span-8 flex gap-2">
                 <Select value={selection[cat]?.id || "__none__"} onValueChange={(id)=>{ if(id==="__none__"){ onSelect(cat, null); if (required.includes(cat)) toast.error(`${cat} เป็นหมวดจำเป็น`); return; } const item = byCat[cat].find(p=>p.id===id) || null; onSelect(cat, item); }}>
@@ -529,7 +530,7 @@ function BasePicker({ inventory, selection, onSelect, sortMode, onChangeSort, re
           </div>
         </CardContent>
       </Card>
-    </motion.div>
+    </div>
   );
 }
 
@@ -558,12 +559,11 @@ function AddonsPicker({ inventory, addons, addAddon, updateQty, removeAddon, sor
   const totalAddons = addons.reduce((s,a)=>s + a.product.price * a.qty, 0);
 
   return (
-    <motion.div initial={{opacity:0, y:8}} animate={{opacity:1, y:0}} transition={{duration:0.25}}>
     <Card className="shadow-sm">
       <CardHeader><CardTitle className="flex items-center gap-2"><Sparkles className="w-5 h-5"/> Option เสริม</CardTitle></CardHeader>
       <CardContent className="space-y-4">
         {/* Monitor row */}
-        <div className="grid grid-cols-12 items-center gap-2 p-2 rounded-xl hover:bg-muted/40 transition-transform duration-150 hover:scale-[1.01]">
+        <div className="grid grid-cols-12 items-center gap-2 p-2 rounded-xl hover:bg-muted/40">
           <div className="col-span-3 font-medium flex items-center gap-2">{categoryIcon["Monitor"]} Monitor</div>
           <div className="col-span-6">
             <Select value={selMonitor} onValueChange={setSelMonitor}>
@@ -583,7 +583,7 @@ function AddonsPicker({ inventory, addons, addAddon, updateQty, removeAddon, sor
         </div>
 
         {/* Software row */}
-        <div className="grid grid-cols-12 items-center gap-2 p-2 rounded-xl hover:bg-muted/40 transition-transform duration-150 hover:scale-[1.01]">
+        <div className="grid grid-cols-12 items-center gap-2 p-2 rounded-xl hover:bg-muted/40">
           <div className="col-span-3 font-medium flex items-center gap-2">{categoryIcon["Software"]} Software</div>
           <div className="col-span-6">
             <Select value={selSoftware} onValueChange={setSelSoftware}>
@@ -603,7 +603,7 @@ function AddonsPicker({ inventory, addons, addAddon, updateQty, removeAddon, sor
         </div>
 
         {/* SSD row */}
-        <div className="grid grid-cols-12 items-center gap-2 p-2 rounded-xl hover:bg-muted/40 transition-transform duration-150 hover:scale-[1.01]">
+        <div className="grid grid-cols-12 items-center gap-2 p-2 rounded-xl hover:bg-muted/40">
           <div className="col-span-3 font-medium flex items-center gap-2">{categoryIcon["SSD"]} SSD (เพิ่มไดรฟ์เสริม)</div>
           <div className="col-span-6">
             <Select value={selSSD} onValueChange={setSelSSD}>
@@ -641,7 +641,6 @@ function AddonsPicker({ inventory, addons, addAddon, updateQty, removeAddon, sor
         </div>
       </CardContent>
     </Card>
-    </motion.div>
   );
 }
 
@@ -736,7 +735,6 @@ function Summary({ build, onReset, pricing, setPricing, required }:{ build: Buil
   };
 
   return (
-    <motion.div initial={{opacity:0, y:8}} animate={{opacity:1, y:0}} transition={{duration:0.25}}>
     <Card className="shadow-sm">
       <CardHeader><CardTitle className="flex items-center gap-2"><ShoppingCart className="w-5 h-5"/> สรุปสเปค & ราคา</CardTitle></CardHeader>
       <CardContent className="space-y-4">
@@ -811,7 +809,6 @@ function Summary({ build, onReset, pricing, setPricing, required }:{ build: Buil
         </div>
       </CardContent>
     </Card>
-    </motion.div>
   );
 }
 
@@ -865,9 +862,7 @@ export default function App(){
     return () => window.removeEventListener('keydown', onKey);
   }, []);
 
-  
-  useEffect(()=>{ try { document.title = "Ubon Computer Spec V.3.1"; } catch {} }, []);
-const fileRef = useRef<HTMLInputElement>(null);
+  const fileRef = useRef<HTMLInputElement>(null);
 
   const filtered = useMemo(()=>{
     const q = query.trim().toLowerCase(); if (!q) return inventory;
@@ -934,13 +929,14 @@ const fileRef = useRef<HTMLInputElement>(null);
   }, [build.base, smartSync]);
 
   return (
+    <MotionConfig reducedMotion="user">
     <div className="p-4 md:p-8 max-w-7xl mx-auto">
       {/* Modern header */}
       <div className="rounded-2xl p-5 mb-3 bg-gradient-to-r from-slate-900 via-slate-800 to-slate-700 text-white shadow">
         <motion.h1 initial={{opacity:0, y:-8}} animate={{opacity:1, y:0}} className="text-2xl md:text-3xl font-bold tracking-tight">
-          Ubon Computer Spec V.3.1
+          Ubon Computer Speccom V.3
         </motion.h1>
-        <div className="text-slate-300 text-sm mt-1">ระบบจัดสเปคคอมพิวเตอร์ อุบลคอมพิวเตอร์ • ใช้แท็บด้านล่างเพื่อสลับระหว่าง จัดสเปค / คลังสินค้า / สรุปผล</div>
+        <div className="text-slate-300 text-sm mt-1">ระบบจัดสเปคคอมพิวเตอร์ อุบลคอมพิวเตอร์</div>
       </div>
 
       <div className="mb-5 flex flex-col md:flex-row md:items-center md:justify-between gap-2">
@@ -968,7 +964,7 @@ const fileRef = useRef<HTMLInputElement>(null);
                 {BASE_CATEGORIES.map(c=>{
                   const active = required.includes(c);
                   return <Button key={c} variant="secondary" onClick={()=>{
-                    const next = active ? required.filter(x=>x!==c) : [...required, c]; setRequired(next); toast.message(active ? `ยกเลิกหมวดจำเป็น: ${c}` : `กำหนดหมวดจำเป็น: ${c}`);
+                    setRequired(active ? required.filter(x=>x!==c) : [...required, c]);
                   }}>{active ? `✓ ${c}` : c}</Button>;
                 })}
               </div>
@@ -976,8 +972,8 @@ const fileRef = useRef<HTMLInputElement>(null);
               {/* Smart Sync controls */}
               <div className="flex flex-wrap items-center gap-2">
                 <div className="text-sm text-muted-foreground mr-1">Smart Sync (ซิงก์ตัวกรองตามชิ้นส่วนที่เลือก):</div>
-                <Button variant="secondary" onClick={()=>{ setSmartSync(!smartSync); toast.message(!smartSync ? 'เปิด Smart Sync' : 'ปิด Smart Sync'); }}>{smartSync ? "เปิดอยู่" : "ปิดอยู่"}</Button>
-                <Button variant="secondary" onClick={()=>{ setFilters(deriveFiltersFromSelection(build.base, {})); toast.message('ซิงก์ตัวกรองแล้ว'); }}>ซิงก์ตอนนี้</Button>
+                <Button variant="secondary" onClick={()=>setSmartSync(!smartSync)}>{smartSync ? "เปิดอยู่" : "ปิดอยู่"}</Button>
+                <Button variant="secondary" onClick={()=>setFilters(deriveFiltersFromSelection(build.base, {}))}>ซิงก์ตอนนี้</Button>
               </div>
 
               {/* Attribute Filters (chips + clear) */}
@@ -1111,7 +1107,7 @@ const fileRef = useRef<HTMLInputElement>(null);
                 const results = sortProducts(inventory.filter(p => !q || [p.name, p.category, JSON.stringify(p.attributes)].join(" ").toLowerCase().includes(q)), sortMode);
                 if (results.length === 0) return <div className="px-4 py-3 text-muted-foreground">ไม่พบสินค้า</div>;
                 return results.map(p => (
-                  <div key={p.id} className="flex items-center justify-between px-4 py-2 border-t first:border-t-0 hover:bg-muted/40 transition-transform duration-150 hover:scale-[1.01]">
+                  <div key={p.id} className="flex items-center justify-between px-4 py-2 border-t first:border-t-0 hover:bg-muted/40">
                     <div className="flex items-center gap-2">
                       <Badge variant="secondary">{p.category}</Badge>
                       <div className="truncate" title={p.name}>{p.name}</div>
